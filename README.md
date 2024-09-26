@@ -1,112 +1,89 @@
+# Zypper Upgrade Notification Services
 
-# Transactional Update Error Checker
+This repository contains systemd services designed to run `zypper dist-upgrade` during system shutdown and to notify the user of the success or failure of the upgrade upon the next boot.
 
-This setup creates two systemd services that manage updates on shutdown and notify the user of any errors during the next boot.
+## Overview
 
-- The first service runs `transactional-update` during shutdown.
-- The second service checks for errors during the next boot and notifies the user if any issues occurred.
+- **zypper-upgrade.service**: Executes `zypper dist-upgrade` when the system is shutting down. If the upgrade fails, it creates a marker file to indicate the failure.
+- **upgrade-notification.service**: Sends a desktop notification upon boot, indicating whether the last `zypper dist-upgrade` was successful or failed.
 
-## Installation Steps
+## Prerequisites
 
-### 1. Create the Transactional Update Shutdown Service
+- A Linux distribution that uses `systemd`.
+- `zypper` package manager installed (typically found in openSUSE).
+- `notify-send` command available (part of the `libnotify` package).
 
-This service runs `transactional-update` during shutdown and logs its output.
+## Installation
 
-1. Create the systemd service file:
-```bash
-sudo nano /etc/systemd/system/transactional-update-shutdown.service
-```
+1. **Create Service Files**:
+
+   Create the following service files in the `/etc/systemd/system/` directory.
+
+   ### 1. zypper-upgrade.service
+
+   Create the file with the command:
+
+   ```bash
+   sudo vim /etc/systemd/system/zypper-upgrade.service
+   ```
 Add the following content:
 
 ```ini
 
 [Unit]
-Description=Run transactional-update on shutdown
+Description=Run Zypper Dist-Upgrade at Shutdown
 DefaultDependencies=no
-Before=shutdown.target reboot.target halt.target
-After=dbus.service  
-Requires=dbus.service 
+Before=shutdown.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/sbin/transactional-update
-StandardOutput=journal
-StandardError=journal
-TimeoutStopSec=30  
+ExecStart=/bin/bash -c '/usr/bin/zypper dist-upgrade -y -l --auto-agree-with-product-licenses --no-recommends || touch /tmp/zypper-upgrade-failed'
+RemainAfterExit=yes
 
 [Install]
-WantedBy=halt.target reboot.target shutdown.target
+WantedBy=halt.target reboot.target
 
-
-```
-Enable the service:
+Create the file with the command:
 
 ```bash
 
-    sudo systemctl enable transactional-update-shutdown.service
-```
-2. Create the Check Update Error Service
-
-This service runs on boot to check if the previous transactional-update resulted in any errors and notifies the user if so.
-
-Create the systemd service file:
-
-```bash
-sudo nano /etc/systemd/system/transactional-update-check.service
+sudo vim /etc/systemd/system/upgrade-notification.service
 ```
 Add the following content:
 
 ```ini
 
 [Unit]
-Description=Check for transactional-update errors on boot
-After=multi-user.target
+Description=Notify if Zypper Upgrade Failed
+After=graphical.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/check-transactional-update-errors.sh
+ExecStart=/bin/bash -c '\
+if [ -f /tmp/zypper-upgrade-failed ]; then \
+    notify-send "Zypper Upgrade Failed" "The last zypper dist-upgrade did not complete successfully."; \
+    rm /tmp/zypper-upgrade-failed; \
+fi'
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target
+
 ```
 
-Enable the service:
+    Reload Systemd Daemon:
+
+    After creating the service files, reload the systemd daemon to recognize the new services:
+
+    bash
+```
+sudo systemctl daemon-reload
+```
+Enable the Services:
+
+Enable both services so that they start as required:
 
 ```bash
 
-    sudo systemctl enable transactional-update-check.service
-```
-3. Create the Error Checking Script
-
-This script checks the log file for errors and notifies the user via desktop notification (or a message to the terminal) if any errors are found.
-
-Create the script:
-
-```bash
-
-sudo nano /usr/local/bin/check-transactional-update-errors.sh
-```
-Add the following content:
-
-```bash
-
-#!/bin/bash
-
-LOG_FILE="/var/log/transactional-update.log"
-
-# Check if the log file contains errors (adjust the keyword based on the error output)
-if grep -qi "error" "$LOG_FILE"; then
-    # Show an error message using the wall command (for terminal output) or notify-send for graphical sessions
-    if command -v notify-send > /dev/null; then
-        notify-send "Transactional Update" "Errors were detected during the last transactional update. Check the log at /var/log/transactional-update.log."
-    else
-        wall "Errors were detected during the last transactional update. Check the log at /var/log/transactional-update.log."
-    fi
-fi
-```
-Make the script executable:
-
-```bash
-
-    sudo chmod +x /usr/local/bin/check-transactional-update-errors.sh
+    sudo systemctl enable zypper-upgrade.service
+    sudo systemctl enable upgrade-notification.service
 ```
