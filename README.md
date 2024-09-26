@@ -75,7 +75,7 @@ Enable the service:
 
 This script checks the log file for errors and notifies the user via desktop notification (or a message to the terminal) if any errors are found.
 
-    Create the script:
+Create the script:
 
 ```bash
 
