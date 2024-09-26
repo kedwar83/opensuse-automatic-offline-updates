@@ -27,7 +27,7 @@ Before=shutdown.target reboot.target halt.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/transactional-update up
+ExecStart=/usr/sbin/transactional-update up
 StandardOutput=append:/var/log/transactional-update.log
 StandardError=append:/var/log/transactional-update.log
 
