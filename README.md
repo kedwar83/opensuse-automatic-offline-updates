@@ -13,12 +13,12 @@ This setup creates two systemd services that manage updates on shutdown and noti
 This service runs `transactional-update` during shutdown and logs its output.
 
 1. Create the systemd service file:
-   ```bash
-   sudo nano /etc/systemd/system/transactional-update-shutdown.service
+```bash
+sudo nano /etc/systemd/system/transactional-update-shutdown.service
 ```
-    Add the following content:
+Add the following content:
 
-    ```ini
+```ini
 
 [Unit]
 Description=Run transactional-update on shutdown
