@@ -67,7 +67,6 @@ fi'
 
 [Install]
 WantedBy=default.target
-
 ```
 
     Reload Systemd Daemon:
