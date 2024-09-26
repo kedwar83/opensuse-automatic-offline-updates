@@ -121,9 +121,9 @@ Test the Setup
 
 To test the complete setup:
 
-    Trigger a shutdown or reboot.
-    Intentionally cause an error (e.g., disconnect the internet to prevent updates from applying).
-    On the next boot, check if you receive the error notification.
+Trigger a shutdown or reboot.
+Intentionally cause an error (e.g., disconnect the internet to prevent updates from applying).
+On the next boot, check if you receive the error notification.
 
 Logs
 
