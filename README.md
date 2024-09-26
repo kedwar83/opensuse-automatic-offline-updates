@@ -15,10 +15,10 @@ This service runs `transactional-update` during shutdown and logs its output.
 1. Create the systemd service file:
    ```bash
    sudo nano /etc/systemd/system/transactional-update-shutdown.service
-
+```
     Add the following content:
 
-    ini
+    ```ini
 
 [Unit]
 Description=Run transactional-update on shutdown
@@ -36,7 +36,7 @@ WantedBy=halt.target reboot.target shutdown.target
 ```
 Enable the service:
 
-````bash
+```bash
 
     sudo systemctl enable transactional-update-shutdown.service
 ```
@@ -51,8 +51,8 @@ This service runs on boot to check if the previous transactional-update resulted
 sudo nano /etc/systemd/system/transactional-update-check.service
 ```
 Add the following content:
-```bash
-ini
+
+```ini
 
 [Unit]
 Description=Check for transactional-update errors on boot
