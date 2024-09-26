@@ -27,12 +27,15 @@ Before=shutdown.target reboot.target halt.target
 
 [Service]
 Type=oneshot
+ExecStartPre=/bin/sleep 5
 ExecStart=/usr/sbin/transactional-update up
-StandardOutput=append:/var/log/transactional-update.log
-StandardError=append:/var/log/transactional-update.log
+StandardOutput=journal
+StandardError=journal
+TimeoutStopSec=30  
 
 [Install]
 WantedBy=halt.target reboot.target shutdown.target
+
 ```
 Enable the service:
 
