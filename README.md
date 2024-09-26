@@ -33,25 +33,25 @@ StandardError=append:/var/log/transactional-update.log
 
 [Install]
 WantedBy=halt.target reboot.target shutdown.target
-
+```
 Enable the service:
 
-bash
+````bash
 
     sudo systemctl enable transactional-update-shutdown.service
-
+```
 2. Create the Check Update Error Service
 
 This service runs on boot to check if the previous transactional-update resulted in any errors and notifies the user if so.
 
     Create the systemd service file:
 
-    bash
+    ```bash
 
 sudo nano /etc/systemd/system/transactional-update-check.service
-
+```
 Add the following content:
-
+```bash
 ini
 
 [Unit]
@@ -64,26 +64,26 @@ ExecStart=/usr/local/bin/check-transactional-update-errors.sh
 
 [Install]
 WantedBy=multi-user.target
-
+```
 Enable the service:
 
-bash
+```bash
 
     sudo systemctl enable transactional-update-check.service
-
+```
 3. Create the Error Checking Script
 
 This script checks the log file for errors and notifies the user via desktop notification (or a message to the terminal) if any errors are found.
 
     Create the script:
 
-    bash
+    ```bash
 
 sudo nano /usr/local/bin/check-transactional-update-errors.sh
-
+```
 Add the following content:
 
-bash
+```bash
 
 #!/bin/bash
 
@@ -98,13 +98,13 @@ if grep -qi "error" "$LOG_FILE"; then
         wall "Errors were detected during the last transactional update. Check the log at /var/log/transactional-update.log."
     fi
 fi
-
+```
 Make the script executable:
 
-bash
+```bash
 
     sudo chmod +x /usr/local/bin/check-transactional-update-errors.sh
-
+```
 How It Works
 
     Transactional Update Shutdown Service: This service runs transactional-update during shutdown and logs both output and errors to /var/log/transactional-update.log.
