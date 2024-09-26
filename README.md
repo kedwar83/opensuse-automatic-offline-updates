@@ -42,7 +42,7 @@ RemainAfterExit=yes
 
 [Install]
 WantedBy=halt.target reboot.target
-
+```
 Create the file with the command:
 
 ```bash
