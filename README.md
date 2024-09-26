@@ -9,8 +9,7 @@ This repository contains systemd services designed to run `zypper dist-upgrade` 
 
 ## Prerequisites
 
-- A Linux distribution that uses `systemd`.
-- `zypper` package manager installed (typically found in openSUSE).
+- Opensuse Operating System.
 - `notify-send` command available (part of the `libnotify` package).
 
 ## Installation
@@ -76,7 +75,6 @@ After creating the service files, reload the systemd daemon to recognize the new
 ```bash
 sudo systemctl daemon-reload
 ```
-Enable the Services:
 
 Enable both services so that they start as required:
 
