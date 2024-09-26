@@ -1,6 +1,3 @@
-Certainly! Here's the full README.md file in Markdown format:
-
-markdown
 
 # Transactional Update Error Checker
 
