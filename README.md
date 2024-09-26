@@ -6,11 +6,6 @@ This setup creates two systemd services that manage updates on shutdown and noti
 - The first service runs `transactional-update` during shutdown.
 - The second service checks for errors during the next boot and notifies the user if any issues occurred.
 
-## Prerequisites
-
-- A Linux distribution that uses `transactional-update`, such as openSUSE MicroOS or SUSE Linux Enterprise Micro.
-- `libnotify` for desktop notifications (or `dunst`, depending on your environment).
-
 ## Installation Steps
 
 ### 1. Create the Transactional Update Shutdown Service
