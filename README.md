@@ -24,17 +24,19 @@ Add the following content:
 Description=Run transactional-update on shutdown
 DefaultDependencies=no
 Before=shutdown.target reboot.target halt.target
+After=dbus.service  
+Requires=dbus.service 
 
 [Service]
 Type=oneshot
-ExecStartPre=/bin/sleep 5
-ExecStart=/usr/sbin/transactional-update up
+ExecStart=/usr/sbin/transactional-update
 StandardOutput=journal
 StandardError=journal
 TimeoutStopSec=30  
 
 [Install]
 WantedBy=halt.target reboot.target shutdown.target
+
 
 ```
 Enable the service:
