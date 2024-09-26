@@ -114,18 +114,3 @@ How It Works
     Notifications:
         If running in a graphical session and notify-send is available, a desktop notification will appear.
         If running in a terminal-only environment, a message will be broadcasted to all users with wall.
-
-
-
-Test the Setup
-
-To test the complete setup:
-
-Trigger a shutdown or reboot.
-Intentionally cause an error (e.g., disconnect the internet to prevent updates from applying).
-On the next boot, check if you receive the error notification.
-
-Logs
-
-Log files for transactional-update can be found at /var/log/transactional-update.log.
-The second service checks this log file for any errors that occurred during the last update.
