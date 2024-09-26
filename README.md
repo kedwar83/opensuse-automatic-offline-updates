@@ -105,9 +105,3 @@ Make the script executable:
 
     sudo chmod +x /usr/local/bin/check-transactional-update-errors.sh
 ```
-How It Works
-
-    * Transactional Update Shutdown Service: This service runs transactional-update during shutdown and logs both output and errors to /var/log/transactional-update.log.
-
-    * Check Update Error Service: During the next boot, the error checking service runs and looks for errors in the log file. If any errors are detected, it notifies the user with either a terminal message (wall) or a desktop notification (notify-send).
-
