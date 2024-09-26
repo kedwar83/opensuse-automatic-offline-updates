@@ -69,9 +69,9 @@ fi'
 WantedBy=default.target
 ```
 
-    Reload Systemd Daemon:
+Reload Systemd Daemon:
 
-    After creating the service files, reload the systemd daemon to recognize the new services:
+After creating the service files, reload the systemd daemon to recognize the new services:
 
 ```bash
 sudo systemctl daemon-reload
