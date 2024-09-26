@@ -44,10 +44,9 @@ Enable the service:
 
 This service runs on boot to check if the previous transactional-update resulted in any errors and notifies the user if so.
 
-    Create the systemd service file:
+Create the systemd service file:
 
-    ```bash
-
+```bash
 sudo nano /etc/systemd/system/transactional-update-check.service
 ```
 Add the following content:
@@ -65,6 +64,7 @@ ExecStart=/usr/local/bin/check-transactional-update-errors.sh
 [Install]
 WantedBy=multi-user.target
 ```
+
 Enable the service:
 
 ```bash
@@ -77,7 +77,7 @@ This script checks the log file for errors and notifies the user via desktop not
 
     Create the script:
 
-    ```bash
+```bash
 
 sudo nano /usr/local/bin/check-transactional-update-errors.sh
 ```
