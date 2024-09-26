@@ -127,5 +127,5 @@ On the next boot, check if you receive the error notification.
 
 Logs
 
-    Log files for transactional-update can be found at /var/log/transactional-update.log.
-    The second service checks this log file for any errors that occurred during the last update.
+Log files for transactional-update can be found at /var/log/transactional-update.log.
+The second service checks this log file for any errors that occurred during the last update.
