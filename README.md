@@ -74,8 +74,7 @@ WantedBy=default.target
 
     After creating the service files, reload the systemd daemon to recognize the new services:
 
-    bash
-```
+```bash
 sudo systemctl daemon-reload
 ```
 Enable the Services:
