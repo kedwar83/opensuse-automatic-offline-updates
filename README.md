@@ -14,29 +14,28 @@
 
    **zypper-upgrade.service**:
    ```ini
-   [Unit]
-[Unit]
-Description=Run Zypper Refresh and Dist-Upgrade at Startup
-DefaultDependencies=no
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=oneshot
-ExecStart=/bin/bash -c '\
-if nm-online -q; then \
-    if ! /usr/bin/zypper refresh; then \
-        echo "Zypper refresh failed" > /tmp/zypper-refresh-failed; \
-        exit 1; \
-    fi && \
-    if ! /usr/bin/zypper dist-upgrade -y --auto-agree-with-product-licenses --no-recommends; then \
-        echo "Zypper dist-upgrade failed" > /tmp/zypper-upgrade-failed; \
-        exit 1; \
-    fi; \
-else \
-    echo "No internet connection, skipping updates." > /tmp/no-internet; \
-fi'
-RemainAfterExit=yes
+  [Unit]
+  Description=Run Zypper Refresh and Dist-Upgrade at Startup
+  DefaultDependencies=no
+  After=network-online.target
+  Wants=network-online.target
+  
+  [Service]
+  Type=oneshot
+  ExecStart=/bin/bash -c '\
+  if nm-online -q; then \
+      if ! /usr/bin/zypper refresh; then \
+          echo "Zypper refresh failed" > /tmp/zypper-refresh-failed; \
+          exit 1; \
+      fi && \
+      if ! /usr/bin/zypper dist-upgrade -y --auto-agree-with-product-licenses --no-recommends; then \
+          echo "Zypper dist-upgrade failed" > /tmp/zypper-upgrade-failed; \
+          exit 1; \
+      fi; \
+  else \
+      echo "No internet connection, skipping updates." > /tmp/no-internet; \
+  fi'
+  RemainAfterExit=yes
 
 [Install]
 WantedBy=multi-user.target
