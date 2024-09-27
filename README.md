@@ -1,55 +1,98 @@
-# KDE Cursor Hiding Script
+# Zypper Upgrade Notification Services
 
-This script automatically hides the mouse cursor in KDE after a period of inactivity.
+This repository contains systemd services for running `zypper dist-upgrade` during system shutdown and notifying the user of the upgrade status upon the next boot.
 
-## Description
+## Services
 
-The script waits for the KDE window manager (KWin) to start, then launches the `unclutter` tool to hide the mouse cursor after 2 seconds of inactivity. It's designed to run at KDE startup.
+1. **zypper-upgrade.service**: Executes `zypper refresh` and `zypper dist-upgrade` during system shutdown.
+2. **upgrade-notification.service**: Sends a desktop notification upon boot about the upgrade status.
 
 ## Prerequisites
 
-- KDE Plasma desktop environment
-- `unclutter` tool installed
-- `pgrep` command (usually pre-installed on most Linux distributions)
+- openSUSE operating system
+- `notify-send` command (part of the `libnotify` package)
 
 ## Installation
 
-1. Save the script to a suitable location, e.g., `~/.local/bin/hide_cursor.sh`
+1. Create service files in `/etc/systemd/system/`:
 
-2. Make the script executable:
+   **zypper-upgrade.service**:
+   ```ini
+   [Unit]
+   Description=Run Zypper Refresh and Dist-Upgrade at Shutdown
+   DefaultDependencies=no
+   Before=shutdown.target
+
+   [Service]
+   Type=oneshot
+   ExecStart=/bin/bash -c '\
+   if ! /usr/bin/zypper refresh; then \
+       echo "Zypper refresh failed" > /tmp/zypper-refresh-failed; \
+       exit 1; \
+   fi && \
+   if ! /usr/bin/zypper dist-upgrade -y -l --auto-agree-with-product-licenses --no-recommends; then \
+       echo "Zypper dist-upgrade failed" > /tmp/zypper-upgrade-failed; \
+       exit 1; \
+   fi'
+   RemainAfterExit=yes
+
+   [Install]
+   WantedBy=halt.target reboot.target
    ```
-   chmod +x ~/.local/bin/hide_cursor.sh
+
+   **upgrade-notification.service**:
+   ```ini
+   [Unit]
+   Description=Notify if Zypper Refresh or Upgrade Failed
+   After=graphical.target
+
+   [Service]
+   Type=oneshot
+   ExecStart=/bin/bash -c 'if [ -f /tmp/zypper-refresh-failed ]; then \
+       notify-send "Zypper Refresh Failed" "$(cat /tmp/zypper-refresh-failed). Manual intervention may be necessary."; \
+       rm /tmp/zypper-refresh-failed; \
+   elif [ -f /tmp/zypper-upgrade-failed ]; then \
+       notify-send "Zypper Upgrade Failed" "$(cat /tmp/zypper-upgrade-failed)"; \
+       rm /tmp/zypper-upgrade-failed; \
+   fi'
+
+   [Install]
+   WantedBy=default.target
    ```
 
-3. To run at KDE startup, create a file `~/.config/autostart/hide_cursor.desktop` with the following content:
+2. Reload systemd daemon:
    ```
-   [Desktop Entry]
-   Type=Application
-   Name=Hide Cursor
-   Exec=/home/yourusername/.local/bin/hide_cursor.sh
-   X-GNOME-Autostart-enabled=true
+   sudo systemctl daemon-reload
    ```
-   Replace "yourusername" with your actual username.
 
-## Usage
+3. Enable services:
+   ```
+   sudo systemctl enable zypper-upgrade.service
+   sudo systemctl enable upgrade-notification.service
+   ```
 
-The script will run automatically at KDE startup if set up as described above. To run manually:
+## Functionality
 
-```
-~/.local/bin/hide_cursor.sh
-```
+- `zypper-upgrade.service` runs `zypper refresh` followed by `zypper dist-upgrade` during system shutdown.
+- If `zypper refresh` fails, it creates `/tmp/zypper-refresh-failed`.
+- If `zypper dist-upgrade` fails, it creates `/tmp/zypper-upgrade-failed`.
+- `upgrade-notification.service` checks for these files on next boot and sends appropriate notifications.
 
-## Customization
+## Error Handling
 
-- To change the inactivity period, modify the `-idle 2` part of the `unclutter` command in the script. The number represents seconds.
+- Refresh failure: Notifies that manual intervention may be necessary.
+- Upgrade failure: Notifies about the upgrade failure.
 
 ## Troubleshooting
 
-If the cursor doesn't hide:
-1. Ensure `unclutter` is installed
-2. Check if the script is running: `pgrep -f hide_cursor.sh`
-3. Look for error messages: `journalctl -xe | grep hide_cursor.sh`
+Check service status:
+```
+sudo systemctl status zypper-upgrade.service
+sudo systemctl status upgrade-notification.service
+```
 
-## License
-
-This script is provided "as is", without warranty of any kind. You are free to modify and distribute it.
+View logs:
+```
+journalctl -u zypper-upgrade.service
+journalctl -u upgrade-notification.service
+```
