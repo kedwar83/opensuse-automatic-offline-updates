@@ -1,7 +1,3 @@
-# Zypper Upgrade Notification Services
-
-This repository contains systemd services for running `zypper dist-upgrade` during system shutdown and notifying the user of the upgrade status upon the next boot.
-
 ## Services
 
 1. **zypper-upgrade.service**: Executes `zypper refresh` and `zypper dist-upgrade` during system shutdown.
@@ -19,25 +15,32 @@ This repository contains systemd services for running `zypper dist-upgrade` duri
    **zypper-upgrade.service**:
    ```ini
    [Unit]
-   Description=Run Zypper Refresh and Dist-Upgrade at Shutdown
-   DefaultDependencies=no
-   Before=shutdown.target
+[Unit]
+Description=Run Zypper Refresh and Dist-Upgrade at Startup
+DefaultDependencies=no
+After=network-online.target
+Wants=network-online.target
 
-   [Service]
-   Type=oneshot
-   ExecStart=/bin/bash -c '\
-   if ! /usr/bin/zypper refresh; then \
-       echo "Zypper refresh failed" > /tmp/zypper-refresh-failed; \
-       exit 1; \
-   fi && \
-   if ! /usr/bin/zypper dist-upgrade -y -l --auto-agree-with-product-licenses --no-recommends; then \
-       echo "Zypper dist-upgrade failed" > /tmp/zypper-upgrade-failed; \
-       exit 1; \
-   fi'
-   RemainAfterExit=yes
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c '\
+if nm-online -q; then \
+    if ! /usr/bin/zypper refresh; then \
+        echo "Zypper refresh failed" > /tmp/zypper-refresh-failed; \
+        exit 1; \
+    fi && \
+    if ! /usr/bin/zypper dist-upgrade -y --auto-agree-with-product-licenses --no-recommends; then \
+        echo "Zypper dist-upgrade failed" > /tmp/zypper-upgrade-failed; \
+        exit 1; \
+    fi; \
+else \
+    echo "No internet connection, skipping updates." > /tmp/no-internet; \
+fi'
+RemainAfterExit=yes
 
-   [Install]
-   WantedBy=halt.target reboot.target
+[Install]
+WantedBy=multi-user.target
+
    ```
 
    **upgrade-notification.service**:
@@ -45,6 +48,7 @@ This repository contains systemd services for running `zypper dist-upgrade` duri
    [Unit]
    Description=Notify if Zypper Refresh or Upgrade Failed
    After=graphical.target
+   Wants=graphical.target
 
    [Service]
    Type=oneshot
@@ -76,12 +80,8 @@ This repository contains systemd services for running `zypper dist-upgrade` duri
 - `zypper-upgrade.service` runs `zypper refresh` followed by `zypper dist-upgrade` during system shutdown.
 - If `zypper refresh` fails, it creates `/tmp/zypper-refresh-failed`.
 - If `zypper dist-upgrade` fails, it creates `/tmp/zypper-upgrade-failed`.
-- `upgrade-notification.service` checks for these files on next boot and sends appropriate notifications.
+- `upgrade-notification.service` checks for these files and sends notification on failure.
 
-## Error Handling
-
-- Refresh failure: Notifies that manual intervention may be necessary.
-- Upgrade failure: Notifies about the upgrade failure.
 
 ## Troubleshooting
 
