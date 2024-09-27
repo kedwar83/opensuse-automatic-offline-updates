@@ -1,85 +1,55 @@
-# Zypper Upgrade Notification Services
+# KDE Cursor Hiding Script
 
-This repository contains systemd services designed to run `zypper dist-upgrade` during system shutdown and to notify the user of the success or failure of the upgrade upon the next boot.
+This script automatically hides the mouse cursor in KDE after a period of inactivity.
 
-## Overview
+## Description
 
-- **zypper-upgrade.service**: Executes `zypper dist-upgrade` when the system is shutting down. If the upgrade fails, it creates a marker file to indicate the failure.
-- **upgrade-notification.service**: Sends a desktop notification upon boot, indicating whether the last `zypper dist-upgrade` was successful or failed.
+The script waits for the KDE window manager (KWin) to start, then launches the `unclutter` tool to hide the mouse cursor after 2 seconds of inactivity. It's designed to run at KDE startup.
 
 ## Prerequisites
 
-- Opensuse Operating System.
-- `notify-send` command available (part of the `libnotify` package).
+- KDE Plasma desktop environment
+- `unclutter` tool installed
+- `pgrep` command (usually pre-installed on most Linux distributions)
 
 ## Installation
 
-1. **Create Service Files**:
+1. Save the script to a suitable location, e.g., `~/.local/bin/hide_cursor.sh`
 
-   Create the following service files in the `/etc/systemd/system/` directory.
-
-   ### 1. zypper-upgrade.service
-
-   Create the file with the command:
-
-   ```bash
-   sudo vim /etc/systemd/system/zypper-upgrade.service
+2. Make the script executable:
    ```
-Add the following content:
+   chmod +x ~/.local/bin/hide_cursor.sh
+   ```
 
-```ini
+3. To run at KDE startup, create a file `~/.config/autostart/hide_cursor.desktop` with the following content:
+   ```
+   [Desktop Entry]
+   Type=Application
+   Name=Hide Cursor
+   Exec=/home/yourusername/.local/bin/hide_cursor.sh
+   X-GNOME-Autostart-enabled=true
+   ```
+   Replace "yourusername" with your actual username.
 
-[Unit]
-Description=Run Zypper Dist-Upgrade at Shutdown
-DefaultDependencies=no
-Before=shutdown.target
+## Usage
 
-[Service]
-Type=oneshot
-ExecStart=/bin/bash -c '/usr/bin/zypper dist-upgrade -y -l --auto-agree-with-product-licenses --no-recommends || touch /tmp/zypper-upgrade-failed'
-RemainAfterExit=yes
+The script will run automatically at KDE startup if set up as described above. To run manually:
 
-[Install]
-WantedBy=halt.target reboot.target
 ```
-Create the file with the command:
-
-```bash
-
-sudo vim /etc/systemd/system/upgrade-notification.service
-```
-Add the following content:
-
-```ini
-
-[Unit]
-Description=Notify if Zypper Upgrade Failed
-After=graphical.target
-
-[Service]
-Type=oneshot
-ExecStart=/bin/bash -c '\
-if [ -f /tmp/zypper-upgrade-failed ]; then \
-    notify-send "Zypper Upgrade Failed" "The last zypper dist-upgrade did not complete successfully."; \
-    rm /tmp/zypper-upgrade-failed; \
-fi'
-
-[Install]
-WantedBy=default.target
+~/.local/bin/hide_cursor.sh
 ```
 
-Reload Systemd Daemon:
+## Customization
 
-After creating the service files, reload the systemd daemon to recognize the new services:
+- To change the inactivity period, modify the `-idle 2` part of the `unclutter` command in the script. The number represents seconds.
 
-```bash
-sudo systemctl daemon-reload
-```
+## Troubleshooting
 
-Enable both services so that they start as required:
+If the cursor doesn't hide:
+1. Ensure `unclutter` is installed
+2. Check if the script is running: `pgrep -f hide_cursor.sh`
+3. Look for error messages: `journalctl -xe | grep hide_cursor.sh`
 
-```bash
+## License
 
-    sudo systemctl enable zypper-upgrade.service
-    sudo systemctl enable upgrade-notification.service
-```
+This script is provided "as is", without warranty of any kind. You are free to modify and distribute it.
