@@ -1,6 +1,6 @@
 ## Services
 
-1. **zypper-upgrade.service**: Executes `zypper refresh` and `zypper dist-upgrade` during system shutdown.
+1. **zypper-upgrade.service**: Executes `zypper refresh` and `zypper dist-upgrade` during system startup.
 2. **upgrade-notification.service**: Sends a desktop notification upon boot about the upgrade status.
 
 ## Prerequisites
