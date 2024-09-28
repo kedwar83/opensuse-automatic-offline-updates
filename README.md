@@ -160,6 +160,15 @@ If you encounter issues:
    sudo zypper refresh
    sudo zypper dup --dry-run
    ```
+## Differences from Transactional-Update
+
+This Zypper Auto-Update Systemd Service is designed to provide a different experience compared to the standard transactional-update feature. Here are the key distinctions:
+
+    No Forced Reset: Unlike transactional updates that often require a system reset to apply changes, this service allows for updates without immediately forcing a reboot, providing more flexibility in managing the update schedule.
+
+    Delayed Change Saving: If no reset is initiated, the changes made by the update will not be saved until the next update cycle. This could lead to some inconvenience, as users may need to be mindful of the timing of updates to ensure that changes are applied properly.
+
+    Notification on Failure: In the event of a failure during the update process, the service includes a notification mechanism that alerts the user. This ensures that any issues are promptly communicated, allowing for timely troubleshooting and resolution.
 
 ## Contributing
 
