@@ -1,97 +1,155 @@
-## Services
+# Zypper Auto-Update Systemd Services
 
-1. **zypper-upgrade.service**: Executes `zypper refresh` and `zypper dist-upgrade` during system startup.
-2. **upgrade-notification.service**: Sends a desktop notification upon boot about the upgrade status.
+This project provides a set of `systemd` services for automating Zypper repository refreshing, update downloading, offline update application, and user notification in case of failures. These services work together to keep your openSUSE or SUSE Linux Enterprise system up-to-date with minimal user intervention.
 
-## Prerequisites
+## Services Overview
 
-- openSUSE operating system
-- `notify-send` command (part of the `libnotify` package)
+1. **Zypper Refresh and Download Updates** (`zypper-refresh-download.service`)
+2. **Zypper Offline Update** (`zypper-offline-update.service`)
+3. **Zypper Update Notification** (`zypper-update-notify-failure.service`)
 
-## Installation
+## Detailed Service Descriptions
 
-1. Create service files in `/etc/systemd/system/`:
+### 1. Zypper Refresh and Download Updates (`zypper-refresh-download.service`)
 
-   **zypper-upgrade.service**:
-   ```ini
-    [Unit]
-    Description=Run Zypper Refresh and Dist-Upgrade at Startup
-    DefaultDependencies=no
-    After=network-online.target
-    Wants=network-online.target
-    
-    [Service]
-    Type=oneshot
-    ExecStart=/bin/bash -c '\
-    if nm-online -q; then \
-        if ! /usr/bin/zypper refresh; then \
-            echo "Zypper refresh failed" > /tmp/zypper-refresh-failed; \
-            exit 1; \
-        fi && \
-        if ! /usr/bin/zypper dist-upgrade -y --auto-agree-with-product-licenses --no-recommends; then \
-            echo "Zypper dist-upgrade failed" > /tmp/zypper-upgrade-failed; \
-            exit 1; \
-        fi; \
-    else \
-        echo "No internet connection, skipping updates." > /tmp/no-internet; \
+This service refreshes the Zypper repositories and downloads available updates using the `--download-only` option. It runs daily without user interaction.
+
+#### Script (`/usr/local/bin/zypper-refresh-download.sh`)
+
+```bash
+#!/bin/bash
+
+# Refresh repositories
+/usr/bin/zypper --non-interactive refresh
+
+# Download updates (non-interactive) without changing recommendations and other specified options
+/usr/bin/zypper --non-interactive dup -y --no-recommends --allow-downgrade --allow-name-change --allow-arch-change --allow-vendor-change -D --download-only
+
+# Create a flag file to indicate the update was triggered
+/usr/bin/touch /var/run/zypper-update-triggered
+```
+
+#### Service Configuration (`/etc/systemd/system/zypper-refresh-download.service`)
+
+```ini
+[Unit]
+Description=Zypper Refresh and Download Updates (Non-interactive)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+TimeoutStartSec=0
+ExecStart=/usr/local/bin/zypper-refresh-download.sh
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### 2. Zypper Offline Update (`zypper-offline-update.service`)
+
+This service applies the downloaded updates during system shutdown, ensuring that the system is up-to-date when it next boots.
+
+#### Script (`/usr/local/bin/zypper-offline-update.sh`)
+
+```bash
+#!/bin/bash
+
+# Check if updates were downloaded
+if [ -f /var/run/zypper-update-triggered ]; then
+    # Apply updates
+    /usr/bin/zypper --non-interactive dup -y --no-recommends --allow-downgrade --allow-name-change --allow-arch-change --allow-vendor-change
+
+    # Remove the trigger file
+    rm /var/run/zypper-update-triggered
+fi
+```
+
+#### Service Configuration (`/etc/systemd/system/zypper-offline-update.service`)
+
+```ini
+[Unit]
+Description=Zypper Offline Update
+DefaultDependencies=no
+Conflicts=shutdown.target
+After=network.target network-online.target
+Before=shutdown.target reboot.target halt.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/zypper-offline-update.sh
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### 3. Zypper Update Notification (`zypper-update-notify-failure.service`)
+
+This service checks if either the refresh and download service or the offline update service has failed, and sends a desktop notification if so.
+
+#### Service Configuration (`/etc/systemd/system/zypper-update-notify-failure.service`)
+
+```ini
+[Unit]
+Description=Notify if Zypper Update Services Failed
+Wants=zypper-refresh-download.service zypper-offline-update.service
+After=zypper-refresh-download.service zypper-offline-update.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c '\
+    if systemctl --quiet is-failed zypper-refresh-download.service || \
+       systemctl --quiet is-failed zypper-offline-update.service; then \
+        /usr/bin/notify-send "Zypper Update Failed" "One of the Zypper services has failed. Please check the logs."; \
     fi'
-    RemainAfterExit=yes
-  
-    [Install]
-    WantedBy=multi-user.target
 
+[Install]
+WantedBy=multi-user.target
+```
+
+## Installation and Usage
+
+1. Save the scripts to their respective locations (`/usr/local/bin/`).
+2. Make the scripts executable:
    ```
-
-   **upgrade-notification.service**:
-   ```ini
-   [Unit]
-   Description=Notify if Zypper Refresh or Upgrade Failed
-   After=graphical.target
-   Wants=graphical.target
-
-   [Service]
-   Type=oneshot
-   ExecStart=/bin/bash -c 'if [ -f /tmp/zypper-refresh-failed ]; then \
-       notify-send "Zypper Refresh Failed" "$(cat /tmp/zypper-refresh-failed). Manual intervention may be necessary."; \
-       rm /tmp/zypper-refresh-failed; \
-   elif [ -f /tmp/zypper-upgrade-failed ]; then \
-       notify-send "Zypper Upgrade Failed" "$(cat /tmp/zypper-upgrade-failed)"; \
-       rm /tmp/zypper-upgrade-failed; \
-   fi'
-
-   [Install]
-   WantedBy=default.target
+   sudo chmod +x /usr/local/bin/zypper-refresh-download.sh /usr/local/bin/zypper-offline-update.sh
    ```
-
-2. Reload systemd daemon:
+3. Save the service files to `/etc/systemd/system/`.
+4. Reload the systemd daemon:
    ```
    sudo systemctl daemon-reload
    ```
-
-3. Enable services:
+5. Enable and start the services:
    ```
-   sudo systemctl enable zypper-upgrade.service
-   sudo systemctl enable upgrade-notification.service
+   sudo systemctl enable --now zypper-refresh-download.service zypper-offline-update.service zypper-update-notify-failure.service
    ```
-
-## Functionality
-
-- `zypper-upgrade.service` runs `zypper refresh` followed by `zypper dist-upgrade` during system shutdown.
-- If `zypper refresh` fails, it creates `/tmp/zypper-refresh-failed`.
-- If `zypper dist-upgrade` fails, it creates `/tmp/zypper-upgrade-failed`.
-- `upgrade-notification.service` checks for these files and sends notification on failure.
-
 
 ## Troubleshooting
 
-Check service status:
-```
-sudo systemctl status zypper-upgrade.service
-sudo systemctl status upgrade-notification.service
-```
+If you encounter issues:
 
-View logs:
-```
-journalctl -u zypper-upgrade.service
-journalctl -u upgrade-notification.service
-```
+1. Check the status of the services:
+   ```
+   sudo systemctl status zypper-refresh-download.service
+   sudo systemctl status zypper-offline-update.service
+   sudo systemctl status zypper-update-notify-failure.service
+   ```
+2. View the system logs:
+   ```
+   journalctl -xe
+   ```
+3. Ensure that Zypper is working correctly by running basic commands manually:
+   ```
+   sudo zypper refresh
+   sudo zypper dup --dry-run
+   ```
+
+## Contributing
+
+Contributions to improve these services are welcome. Please submit pull requests or open issues on the project's GitHub repository.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
