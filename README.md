@@ -20,10 +20,10 @@ This service refreshes the Zypper repositories and downloads available updates u
 #!/bin/bash
 
 # Refresh repositories
-/usr/bin/zypper --non-interactive refresh
+/usr/bin/zypper refresh
 
 # Download updates (non-interactive) without changing recommendations and other specified options
-/usr/bin/zypper --non-interactive dup -y --no-recommends --allow-downgrade --allow-name-change --allow-arch-change --allow-vendor-change -D --download-only
+/usr/bin/zypper dup -y --no-recommends -D --download-only
 
 # Create a flag file to indicate the update was triggered
 /usr/bin/touch /var/run/zypper-update-triggered
@@ -32,19 +32,19 @@ This service refreshes the Zypper repositories and downloads available updates u
 #### Service Configuration (`/etc/systemd/system/zypper-refresh-download.service`)
 
 ```ini
-[Unit]
-Description=Zypper Refresh and Download Updates (Non-interactive)
-Wants=network-online.target
-After=network-online.target
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-TimeoutStartSec=0
-ExecStart=/usr/local/bin/zypper-refresh-download.sh
-
-[Install]
-WantedBy=multi-user.target
+[Unit] 
+Description=Zypper Refresh and Download Updates (Non-interactive) 
+Wants=network-online.target 
+After=network-online.target 
+ 
+[Service] 
+Type=oneshot 
+RemainAfterExit=yes 
+ExecStart=/usr/local/bin/zypper-refresh-download.sh 
+ExecStartPost=/usr/bin/systemctl start zypper-update-notify-failure.service 
+ 
+[Install] 
+WantedBy=multi-user.target 
 ```
 
 ### 2. Zypper Offline Update (`zypper-offline-update.service`)
@@ -59,7 +59,7 @@ This service applies the downloaded updates during system shutdown, ensuring tha
 # Check if updates were downloaded
 if [ -f /var/run/zypper-update-triggered ]; then
     # Apply updates
-    /usr/bin/zypper --non-interactive dup -y --no-recommends --allow-downgrade --allow-name-change --allow-arch-change --allow-vendor-change
+    /usr/bin/zypper dup -y --no-recommends
 
     # Remove the trigger file
     rm /var/run/zypper-update-triggered
