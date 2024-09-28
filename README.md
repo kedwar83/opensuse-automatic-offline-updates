@@ -12,7 +12,7 @@ This project provides a set of `systemd` services for automating Zypper reposito
 
 ### 1. Zypper Refresh and Download Updates (`zypper-refresh-download.service`)
 
-This service refreshes the Zypper repositories and downloads available updates using the `--download-only` option. It runs daily without user interaction.
+This service refreshes the Zypper repositories and downloads available updates using the --download-only option. It runs once daily, but only after the system has been booted for at least one hour, without user interaction.
 
 #### Script (`/usr/local/bin/zypper-refresh-download.sh`)
 
@@ -32,19 +32,34 @@ This service refreshes the Zypper repositories and downloads available updates u
 #### Service Configuration (`/etc/systemd/system/zypper-refresh-download.service`)
 
 ```ini
-[Unit] 
-Description=Zypper Refresh and Download Updates (Non-interactive) 
-Wants=network-online.target 
-After=network-online.target 
- 
-[Service] 
-Type=oneshot 
-RemainAfterExit=yes 
-ExecStart=/usr/local/bin/zypper-refresh-download.sh 
-ExecStartPost=/usr/bin/systemctl start zypper-update-notify-failure.service 
- 
-[Install] 
-WantedBy=multi-user.target 
+[Unit]
+Description=Zypper Refresh and Download Updates (Non-interactive)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+TimeoutStartSec=0
+ExecStart=/usr/local/bin/zypper-refresh-download.sh
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### Timer Configuration (`/etc/systemd/system/zypper-refresh-download.timer`)
+
+```ini
+[Unit]
+Description=Run Zypper Refresh and Download Updates daily
+
+[Timer]
+OnBootSec=1h
+OnUnitActiveSec=24h
+RandomizedDelaySec=1800
+
+[Install]
+WantedBy=timers.target
 ```
 
 ### 2. Zypper Offline Update (`zypper-offline-update.service`)
