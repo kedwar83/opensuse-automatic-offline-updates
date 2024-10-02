@@ -54,9 +54,9 @@ WantedBy=multi-user.target
 Description=Run Zypper Refresh and Download Updates daily
 
 [Timer]
-OnBootSec=1h
+OnBootSec=5min
 OnUnitActiveSec=24h
-RandomizedDelaySec=1800
+RandomizedDelaySec=2h
 
 [Install]
 WantedBy=timers.target
