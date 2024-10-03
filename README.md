@@ -39,7 +39,6 @@ After=network-online.target
 
 [Service]
 Type=oneshot
-RemainAfterExit=yes
 TimeoutStartSec=0
 ExecStart=/usr/local/bin/zypper-refresh-download.sh
 
