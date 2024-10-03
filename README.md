@@ -87,7 +87,7 @@ fi
 [Unit]
 Description=Zypper Offline Update
 DefaultDependencies=no
-Conflicts=shutdown.target
+Conflicts=suspend.target sleep.target hibernate.target hybrid-sleep.target
 After=network.target network-online.target
 Before=shutdown.target reboot.target halt.target
 
