@@ -23,7 +23,7 @@ This service refreshes the Zypper repositories and downloads available updates u
 /usr/bin/zypper refresh
 
 # Download updates (non-interactive) without changing recommendations and other specified options
-if /usr/bin/zypper dup -y --no-recommends -D --download-only; then
+if /usr/bin/zypper dup -y --no-recommends --download-only; then
     # Create a flag file to indicate the update was triggered and completed successfully
     /usr/bin/touch /var/run/zypper-update-triggered
     echo "Update download completed successfully" | systemd-cat -t zypper-auto-update -p info
@@ -48,21 +48,21 @@ After=network-online.target
 Type=oneshot
 TimeoutStartSec=0
 ExecStartPre=/bin/sleep 10
-ExecStart=/usr/local/bin/zypper-refresh-download.sh
+ExecStart=/usr/local/bin/zypper-refreshownload.sh
 ExecStop=/bin/rm -f /var/run/zypper-update-triggered
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-#### Timer Configuration (/etc/systemd/system/zypper-refresh-download.timer)
+#### Timer Configuration (/etc/systemd/system/zypper-refreshownload.timer)
 
 ```ini
 [Unit]
 Description=Run Zypper Refresh and Download Updates daily
 
 [Timer]
-OnBootSec=1h
+OnBootSec=10m
 OnUnitActiveSec=24h
 RandomizedDelaySec=2h
 
@@ -72,7 +72,7 @@ WantedBy=timers.target
 
 ### 2. Zypper Offline Update (zypper-offline-update.service)
 
-This service applies the downloaded updates during system shutdown, ensuring that the system is up-to-date when it next boots.
+This service applies the downloaded updates during system shutdown, ensuring that the system is up-toate when it next boots.
 
 #### Script (/usr/local/bin/zypper-offline-update.sh)
 
@@ -120,7 +120,7 @@ WantedBy=shutdown.target
 
 This service checks if either the refresh and download service or the offline update service has failed. It waits for a user to log in and then sends a desktop notification if a failure occurred.
 
-#### Script (/usr/local/bin/zypper-update-notify-delayed.sh)
+#### Script (/usr/local/bin/zypper-update-notifyelayed.sh)
 
 ```bash
 #!/bin/bash
