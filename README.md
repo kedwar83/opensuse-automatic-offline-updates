@@ -1,122 +1,83 @@
-# Zypper Auto-Update System
+# Zypper Auto-Update Systemd Services
 
-A systemd-based automatic update system for openSUSE/SUSE systems that safely downloads and applies updates while notifying users of any failures. The system is designed to be resilient to system sleep/suspend states and handles interruptions gracefully.
+This project provides a set of systemd services for automating Zypper repository refreshing, update downloading, offline update application, and user notification in case of failures. These services work together to keep your openSUSE or SUSE Linux Enterprise system up-to-date with minimal user intervention.
 
-## Features
+## Services Overview
 
-- Automatic daily download of updates
-- Resilient to system sleep/suspend interruptions
-- Resume capability for interrupted downloads
-- Safe offline installation during system shutdown
-- Desktop notifications for update failures
-- Comprehensive logging
-- Package-by-package download tracking
-- Lock file management to prevent conflicts
+1. **Zypper Refresh and Download Updates** (zypper-refresh-download.service)
+2. **Zypper Offline Update** (zypper-offline-update.service)
+3. **Zypper Update Notification** (zypper-update-notify-failure.service)
 
-## Components
+## Detailed Service Descriptions and Scripts
 
-### 1. Update Downloader (zypper-refresh-download.sh)
+### 1. Zypper Refresh and Download Updates (zypper-refresh-download.service)
 
-Downloads package updates with sleep state handling and resume capability.
+This service refreshes the Zypper repositories and downloads available updates using the `--download-only` option. It runs once daily, but only after the system has been booted for at least one hour, without user interaction.
+
+#### Script (/usr/local/bin/zypper-refresh-download.sh)
 
 ```bash
 #!/bin/bash
-# /usr/local/bin/zypper-refresh-download.sh
 
-LOCK_FILE="/var/run/zypper-download.lock"
-TRIGGER_FILE="/var/run/zypper-update-triggered"
-FAILED_FILE="/var/run/zypper-update-failed"
-RESUME_FILE="/var/run/zypper-download-resume"
+# Refresh repositories
+/usr/bin/zypper refresh
 
-cleanup() {
-    local exit_code=$?
-    # If we're exiting due to a signal (like sleep), save progress
-    if [ $exit_code -ne 0 ] && [ -f "$LOCK_FILE" ]; then
-        echo "Saving download state for resume" | systemd-cat -t zypper-auto-update -p info
-        if [ -f "$TEMP_DIR/updates.list" ]; then
-            # Save remaining packages to resume file
-            tail -n +$((CURRENT_PACKAGE + 1)) "$TEMP_DIR/updates.list" > "$RESUME_FILE"
-        fi
-        /usr/bin/touch "$FAILED_FILE"
-    fi
-    rm -f "$LOCK_FILE"
-    rm -rf "$TEMP_DIR"
-}
-
-# Set up traps for cleanup
-trap cleanup EXIT INT TERM
-
-# Check if another instance is running
-if [ -f "$LOCK_FILE" ]; then
-    echo "Another download process is running or was interrupted" | systemd-cat -t zypper-auto-update -p warning
+# Download updates (non-interactive) without changing recommendations and other specified options
+if /usr/bin/zypper dup -y --no-recommends --download-only; then
+    # Create a flag file to indicate the update was triggered and completed successfully
+    /usr/bin/touch /var/run/zypper-update-triggered
+    echo "Update download completed successfully" | systemd-cat -t zypper-auto-update -p info
+else
+    echo "Update download failed" | systemd-cat -t zypper-auto-update -p err
     exit 1
 fi
 
-# Create lock file and temp directory
-touch "$LOCK_FILE"
-TEMP_DIR=$(mktemp -d)
-cd "$TEMP_DIR" || exit 1
-
-# Check if we're resuming a previous download
-if [ -f "$RESUME_FILE" ]; then
-    echo "Resuming previous download" | systemd-cat -t zypper-auto-update -p info
-    cp "$RESUME_FILE" "$TEMP_DIR/updates.list"
-    rm -f "$RESUME_FILE"
-else
-    # Fresh start - refresh repositories
-    if ! /usr/bin/zypper refresh; then
-        echo "Repository refresh failed" | systemd-cat -t zypper-auto-update -p err
-        exit 1
-    fi
-
-    # Get list of packages to update
-    if /usr/bin/zypper --quiet patches-check && /usr/bin/zypper --quiet list-updates; then
-        /usr/bin/zypper list-updates --no-refresh | grep "|" | tail -n +4 | cut -d"|" -f2 > "$TEMP_DIR/updates.list"
-    else
-        echo "No updates available" | systemd-cat -t zypper-auto-update -p info
-        rm -f "$FAILED_FILE"
-        exit 0
-    fi
-fi
-
-# Download packages in smaller batches
-BATCH_SIZE=5
-TOTAL_FAILED=0
-CURRENT_PACKAGE=0
-
-while IFS= read -r package; do
-    CURRENT_PACKAGE=$((CURRENT_PACKAGE + 1))
-    
-    if ! /usr/bin/zypper download "$package"; then
-        TOTAL_FAILED=$((TOTAL_FAILED + 1))
-        echo "Failed to download package: $package" | systemd-cat -t zypper-auto-update -p warning
-        sleep 2  # Brief pause before next package
-    else
-        echo "Successfully downloaded package: $package" | systemd-cat -t zypper-auto-update -p info
-    fi
-done < "$TEMP_DIR/updates.list"
-
-if [ $TOTAL_FAILED -eq 0 ]; then
-    /usr/bin/touch "$TRIGGER_FILE"
-    echo "Download completed successfully" | systemd-cat -t zypper-auto-update -p info
-    rm -f "$FAILED_FILE"
-    rm -f "$RESUME_FILE"
-    exit 0
-fi
-
-# If we got here, something went wrong
-/usr/bin/touch "$FAILED_FILE"
-echo "Download process failed" | systemd-cat -t zypper-auto-update -p err
-exit 1
+# Ensure the service exits cleanly
+exit 0
 ```
 
-### 2. Offline Update Script (zypper-offline-update.sh)
+#### Service Configuration (/etc/systemd/system/zypper-refresh-download.service)
 
-Applies downloaded updates during system shutdown.
+```ini
+[Unit]
+Description=Zypper Refresh and Download Updates (Non-interactive)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+TimeoutStartSec=0
+ExecStartPre=/bin/sleep 10
+ExecStart=/usr/local/bin/zypper-refreshownload.sh
+ExecStop=/bin/rm -f /var/run/zypper-update-triggered
+
+[Install]
+WantedBy=multi-user.target
+```
+
+#### Timer Configuration (/etc/systemd/system/zypper-refreshownload.timer)
+
+```ini
+[Unit]
+Description=Run Zypper Refresh and Download Updates daily
+
+[Timer]
+OnBootSec=10m
+OnUnitActiveSec=24h
+RandomizedDelaySec=2h
+
+[Install]
+WantedBy=timers.target
+```
+
+### 2. Zypper Offline Update (zypper-offline-update.service)
+
+This service applies the downloaded updates during system shutdown, ensuring that the system is up-toate when it next boots.
+
+#### Script (/usr/local/bin/zypper-offline-update.sh)
 
 ```bash
 #!/bin/bash
-# /usr/local/bin/zypper-offline-update.sh
 
 # Check if updates were downloaded successfully
 if [ -f /var/run/zypper-update-triggered ]; then
@@ -137,77 +98,7 @@ fi
 exit 0
 ```
 
-### 3. Update Notification Script (zypper-update-notify.sh)
-
-Monitors for update failures and notifies users.
-
-```bash
-#!/bin/bash
-# /usr/local/bin/zypper-update-notify.sh
-
-# Wait a short time for the desktop environment to be fully loaded
-sleep 30
-
-# Get the first logged-in user
-user=$(who | grep '(' | head -1 | awk '{print $1}')
-
-if [ -n "$user" ] && [ -f /var/run/zypper-update-failed ]; then
-    sudo -u $user DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u $user)/bus notify-send "Zypper Update Failed" "The Zypper update download has failed. Please check the logs."
-    rm -f /var/run/zypper-update-failed
-fi
-```
-
-## SystemD Service Files
-
-### Download Service (zypper-refresh-download.service)
-
-```ini
-[Unit]
-Description=Zypper Refresh and Download Updates (Non-interactive)
-Wants=network-online.target
-After=network-online.target
-Before=sleep.target
-RefuseManualStart=no
-RefuseManualStop=no
-StopWhenUnneeded=yes
-
-[Service]
-Type=oneshot
-TimeoutStartSec=3600
-TimeoutStopSec=300
-KillMode=mixed
-KillSignal=SIGTERM
-
-ExecStartPre=/bin/rm -f /var/run/zypper-download.lock
-ExecStart=/usr/local/bin/zypper-refresh-download.sh
-ExecStop=/bin/sh -c '/bin/kill -TERM $MAINPID; sleep 2'
-ExecStopPost=/bin/rm -f /var/run/zypper-download.lock
-
-Restart=on-failure
-RestartSec=60s
-StartLimitInterval=24h
-StartLimitBurst=3
-
-[Install]
-WantedBy=multi-user.target
-```
-
-### Download Timer (zypper-refresh-download.timer)
-
-```ini
-[Unit]
-Description=Run Zypper Refresh and Download Updates daily
-
-[Timer]
-OnBootSec=10m
-OnUnitActiveSec=24h
-RandomizedDelaySec=2h
-
-[Install]
-WantedBy=timers.target
-```
-
-### Offline Update Service (zypper-offline-update.service)
+#### Service Configuration (/etc/systemd/system/zypper-offline-update.service)
 
 ```ini
 [Unit]
@@ -225,135 +116,128 @@ ExecStart=/usr/local/bin/zypper-offline-update.sh
 WantedBy=shutdown.target
 ```
 
-### Notification Service (zypper-update-notify-failure.service)
+### 3. Zypper Update Notification (zypper-update-notify-failure.service)
+
+This service checks if either the refresh and download service or the offline update service has failed. It waits for a user to log in and then sends a desktop notification if a failure occurred.
+
+#### Script (/usr/local/bin/zypper-update-notifyelayed.sh)
+
+```bash
+#!/bin/bash
+
+# Function to check if a user is logged in
+user_logged_in() {
+    who | grep -q '('
+}
+
+# Wait for user login (with a maximum wait time of 1 hour)
+timeout=3600
+counter=0
+while ! user_logged_in && [ $counter -lt $timeout ]; do
+    sleep 10
+    counter=$((counter + 10))
+done
+
+# If no user logged in after timeout, exit
+if [ $counter -ge $timeout ]; then
+    echo "No user logged in after 1 hour. Exiting." | systemd-cat -t zypper-auto-update -p info
+    exit 0
+fi
+
+# Wait an additional 5 minutes
+sleep 300
+
+# Get the first logged-in user
+user=$(who | grep '(' | head -1 | awk '{print $1}')
+
+# Check if either service failed
+if systemctl is-failed --quiet zypper-refresh-download.service || \
+   systemctl is-failed --quiet zypper-offline-update.service; then
+    sudo -u $user DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u $user)/bus notify-send "Zypper Update Failed" "One of the Zypper services has failed. Please check the logs."
+fi
+```
+
+#### Service Configuration (/etc/systemd/system/zypper-update-notify-failure.service)
 
 ```ini
 [Unit]
-Description=Notify if Zypper Update Failed
-After=graphical-session.target
+Description=Notify if Zypper Update Services Failed (Delayed)
+After=zypper-refresh-download.service zypper-offline-update.service
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/zypper-update-notify.sh
-
-[Install]
-WantedBy=default.target
-```
-
-### Notification Path Unit (zypper-update-notify-failure.path)
-
-```ini
-[Unit]
-Description=Watch for Zypper update failure flag
-
-[Path]
-PathExists=/var/run/zypper-update-failed
-Unit=zypper-update-notify-failure.service
+ExecStart=/usr/local/bin/zypper-update-notify-delayed.sh
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-## Installation
+## Installation and Usage
 
-1. Create the necessary directories:
-```bash
-sudo mkdir -p /usr/local/bin
-```
+1. Clone this repository or download the scripts and service files.
 
-2. Create all script files with the content provided above and make them executable:
-```bash
-sudo cp zypper-refresh-download.sh /usr/local/bin/
-sudo cp zypper-offline-update.sh /usr/local/bin/
-sudo cp zypper-update-notify.sh /usr/local/bin/
-sudo chmod +x /usr/local/bin/zypper-*.sh
-```
+2. Save the scripts to their respective locations:
+   ```
+   sudo cp zypper-refresh-download.sh zypper-offline-update.sh zypper-update-notify-delayed.sh /usr/local/bin/
+   ```
 
-3. Create the systemd service files:
-```bash
-sudo cp zypper-refresh-download.service /etc/systemd/system/
-sudo cp zypper-refresh-download.timer /etc/systemd/system/
-sudo cp zypper-offline-update.service /etc/systemd/system/
-sudo cp zypper-update-notify-failure.service /etc/systemd/system/
-sudo cp zypper-update-notify-failure.path /etc/systemd/system/
-```
+3. Make the scripts executable:
+   ```
+   sudo chmod +x /usr/local/bin/zypper-refresh-download.sh /usr/local/bin/zypper-offline-update.sh /usr/local/bin/zypper-update-notify-delayed.sh
+   ```
 
-4. Reload systemd and enable the services:
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now zypper-refresh-download.timer
-sudo systemctl enable zypper-offline-update.service
-sudo systemctl enable --now zypper-update-notify-failure.path
-```
+4. Copy the service files to the systemd directory:
+   ```
+   sudo cp zypper-refresh-download.service zypper-offline-update.service zypper-update-notify-failure.service /etc/systemd/system/
+   ```
 
-## How It Works
+5. Copy the timer file:
+   ```
+   sudo cp zypper-refresh-download.timer /etc/systemd/system/
+   ```
 
-1. **Update Download Process**
-   - Timer triggers download service daily
-   - Updates are downloaded one package at a time
-   - Progress is saved if interrupted by sleep/suspend
-   - Trigger file created when updates are ready
-   - Failures are logged and flagged for notification
+6. Reload the systemd daemon:
+   ```
+   sudo systemctl daemon-reload
+   ```
 
-2. **Sleep/Suspend Handling**
-   - When system sleeps, current progress is saved
-   - Download resumes from last point after wake
-   - Lock files prevent multiple instances
-   - Proper cleanup ensures system consistency
-
-3. **Update Installation**
-   - Updates installed during system shutdown
-   - Ensures no services are running during update
-   - Process is automatic and requires no user intervention
-
-4. **Notification System**
-   - Monitors for update failures using path unit
-   - Displays desktop notifications on failures
-   - Automatically cleans up notification flags
+7. Enable and start the services:
+   ```
+   sudo systemctl enable --now zypper-refresh-download.timer zypper-offline-update.service zypper-update-notify-failure.service
+   ```
 
 ## Troubleshooting
 
-Check service status:
-```bash
-# Check download service status
-sudo systemctl status zypper-refresh-download.service
+If you encounter issues:
 
-# Check offline update service status
-sudo systemctl status zypper-offline-update.service
+1. Check the status of the services:
+   ```
+   sudo systemctl status zypper-refresh-download.service
+   sudo systemctl status zypper-offline-update.service
+   sudo systemctl status zypper-update-notify-failure.service
+   ```
 
-# Check notification path unit status
-sudo systemctl status zypper-update-notify-failure.path
-```
+2. View the system logs:
+   ```
+   sudo journalctl -u zypper-refresh-download
+   sudo journalctl -u zypper-offline-update
+   sudo journalctl -u zypper-update-notify-failure
+   ```
 
-View logs:
-```bash
-# View download service logs
-sudo journalctl -u zypper-refresh-download
+3. Ensure that Zypper is working correctly by running basic commands manually:
+   ```
+   sudo zypper refresh
+   sudo zypper dup --dry-run
+   ```
 
-# View offline update logs
-sudo journalctl -u zypper-offline-update
+## Configuration
 
-# View notification service logs
-sudo journalctl -u zypper-update-notify-failure
-```
+You can modify the behavior of these services by editing the script files in `/usr/local/bin/` or the service files in `/etc/systemd/system/`. After making changes, remember to reload the systemd daemon and restart the affected services.
 
-## Common Issues
+## Contributing
 
-1. **Downloads Failing During Sleep**
-   - Check `/var/run/zypper-download-resume` for interrupted downloads
-   - View logs to see which packages failed
-   - Manually remove lock file if necessary: `sudo rm /var/run/zypper-download.lock`
-
-2. **Updates Not Installing**
-   - Verify trigger file exists: `ls -l /var/run/zypper-update-triggered`
-   - Check offline update logs for errors
-   - Ensure offline update service is enabled
-
-3. **No Notifications**
-   - Verify desktop environment is running
-   - Check notification service logs
-   - Ensure the user has proper permissions
+Contributions to improve these services are welcome. Please submit pull requests or open issues on the project's GitHub repository.
 
 ## License
 
-This software is released under the MIT License.
+This project is licensed under the MIT License - see the LICENSE file for details.
